@@ -3,728 +3,756 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BREAKOUT — 블록 깨기 게임</title>
+  <title>미니게임 허브</title>
   <style>
     :root {
-      --cyan: #00d4ff;
-      --pink: #ff00aa;
-      --dark: #0a0a1a;
-      --card: #12122a;
-      --border: #1e1e40;
+      --primary: #00d4ff;
+      --accent: #ff00aa;
+      --bg: #0a0a1a;
+      --card: #1a1a2e;
+      --border: #2a2a4a;
+      --dim: #888;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; min-height: 100vh; user-select: none; }
 
-    html { scroll-behavior: smooth; }
+    /* HUB */
+    #hub { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 48px 20px; }
+    .hub-header { text-align: center; margin-bottom: 48px; }
+    .hub-header h1 {
+      font-size: 2.8rem; letter-spacing: 3px; margin-bottom: 8px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hub-header p { color: var(--dim); font-size: 1rem; }
+    .game-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; max-width: 900px; }
+    .game-card {
+      width: 260px; background: var(--card); border: 2px solid var(--border);
+      border-radius: 16px; padding: 32px 20px; text-align: center; cursor: pointer;
+      transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+    }
+    .game-card:hover {
+      border-color: var(--primary); transform: translateY(-5px);
+      box-shadow: 0 0 28px rgba(0,212,255,0.35);
+    }
+    .game-card .icon { font-size: 3rem; margin-bottom: 12px; }
+    .game-card h2 { font-size: 1.2rem; margin-bottom: 6px; }
+    .game-card p { color: var(--dim); font-size: 0.85rem; }
 
-    body {
-      background: var(--dark);
-      color: #fff;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      line-height: 1.6;
+    /* GAME VIEW */
+    #game-view { display: none; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+    .topbar { width: 100%; max-width: 900px; display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .back-btn {
+      background: var(--card); border: 2px solid var(--border); color: #fff;
+      padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s;
     }
+    .back-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .game-title {
+      font-size: 1.6rem;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .game-container { display: none; flex-direction: column; align-items: center; gap: 12px; }
+    canvas { border: 2px solid var(--border); border-radius: 8px; box-shadow: 0 0 30px rgba(0,212,255,0.2); }
+    .info-row { display: flex; gap: 28px; font-size: 1rem; color: var(--dim); }
+    .info-row span { color: #fff; font-weight: bold; }
+    .hint { color: #444; font-size: 0.8rem; text-align: center; }
+    .overlay {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      background: rgba(0,0,0,0.85); border: 2px solid var(--primary); border-radius: 16px;
+      padding: 36px 52px; text-align: center; z-index: 10; min-width: 260px;
+    }
+    .overlay h2 { font-size: 1.8rem; margin-bottom: 8px; }
+    .overlay p { color: var(--dim); margin-bottom: 20px; font-size: 0.9rem; }
+    .btn {
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      border: none; color: #fff; padding: 10px 32px; font-size: 1rem;
+      border-radius: 8px; cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.8; }
 
-    /* ── NAV ── */
-    nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 18px 60px;
-      background: #0a0a1acc;
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
+    /* 2048 */
+    #g2-board {
+      display: grid; grid-template-columns: repeat(4, 90px); grid-template-rows: repeat(4, 90px);
+      gap: 10px; background: #13132a; padding: 10px; border-radius: 10px; border: 2px solid var(--border);
     }
-    .nav-logo {
-      font-size: 1.3rem;
-      font-weight: 800;
-      letter-spacing: 3px;
-      background: linear-gradient(90deg, var(--cyan), var(--pink));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .tile {
+      width: 90px; height: 90px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; transition: background 0.1s;
     }
-    .nav-links { display: flex; gap: 32px; list-style: none; }
-    .nav-links a {
-      color: #aaa;
-      text-decoration: none;
-      font-size: 0.9rem;
-      letter-spacing: 1px;
-      transition: color 0.2s;
-    }
-    .nav-links a:hover { color: #fff; }
-    .nav-cta {
-      background: linear-gradient(90deg, var(--cyan), var(--pink));
-      color: #fff !important;
-      padding: 8px 22px;
-      border-radius: 20px;
-      font-weight: 600;
-      font-size: 0.85rem !important;
-    }
+    #g2-msg { font-size: 1.3rem; font-weight: bold; min-height: 28px; text-align: center; }
 
-    /* ── HERO ── */
-    .hero {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 100px 20px 60px;
-      position: relative;
-      overflow: hidden;
+    /* MINESWEEPER */
+    #ms-board { display: grid; gap: 3px; background: var(--card); padding: 10px; border-radius: 10px; border: 2px solid var(--border); }
+    .ms-cell {
+      width: 36px; height: 36px; background: #252540; border: 2px solid #333;
+      border-radius: 4px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background 0.1s;
     }
-    .hero-bg {
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 60% 50% at 50% 0%, #00d4ff18 0%, transparent 70%),
-        radial-gradient(ellipse 50% 40% at 80% 80%, #ff00aa14 0%, transparent 60%);
-      pointer-events: none;
-    }
-    .hero-badge {
-      display: inline-block;
-      background: #00d4ff15;
-      border: 1px solid #00d4ff44;
-      color: var(--cyan);
-      font-size: 0.78rem;
-      letter-spacing: 2px;
-      padding: 6px 18px;
-      border-radius: 20px;
-      margin-bottom: 28px;
-    }
-    .hero h1 {
-      font-size: clamp(3.5rem, 10vw, 7rem);
-      font-weight: 900;
-      letter-spacing: 6px;
-      line-height: 1;
-      background: linear-gradient(135deg, #fff 30%, var(--cyan) 60%, var(--pink) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 24px;
-    }
-    .hero p {
-      font-size: 1.15rem;
-      color: #8888aa;
-      max-width: 520px;
-      margin: 0 auto 40px;
-    }
-    .hero-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-    .btn-primary {
-      background: linear-gradient(90deg, var(--cyan), var(--pink));
-      color: #fff;
-      padding: 14px 36px;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 700;
-      text-decoration: none;
-      letter-spacing: 1px;
-      transition: opacity 0.2s, transform 0.2s;
-      box-shadow: 0 0 30px #00d4ff44;
-    }
-    .btn-primary:hover { opacity: 0.85; transform: translateY(-2px); }
-    .btn-secondary {
-      background: transparent;
-      color: #aaa;
-      padding: 14px 36px;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
-      text-decoration: none;
-      border: 1px solid #333;
-      transition: border-color 0.2s, color 0.2s;
-    }
-    .btn-secondary:hover { border-color: var(--cyan); color: #fff; }
+    .ms-cell:hover:not(.open):not(.flagged) { background: #2a2a4a; }
+    .ms-cell.open { background: #0d0d20; border-color: #1a1a2e; cursor: default; }
+    .ms-cell.flagged { background: #2a1a00; border-color: #ff8822; }
+    .ms-cell.boom { background: #400000; border-color: #ff3333; }
+    #ms-result { font-size: 1.1rem; font-weight: bold; min-height: 26px; text-align: center; }
 
-    /* canvas preview */
-    .hero-preview {
-      margin-top: 60px;
-      position: relative;
-      display: inline-block;
-    }
-    .hero-preview canvas {
-      border-radius: 12px;
-      border: 1px solid #1e1e40;
-      box-shadow: 0 0 60px #00d4ff33, 0 20px 60px #00000066;
-      display: block;
-      max-width: 100%;
-    }
-    .preview-label {
-      position: absolute;
-      top: -12px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(90deg, var(--cyan), var(--pink));
-      color: #fff;
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      padding: 4px 16px;
-      border-radius: 20px;
-      white-space: nowrap;
-    }
+    /* TETRIS */
+    #tet-wrap { display: flex; gap: 20px; align-items: flex-start; }
+    #tet-side { display: flex; flex-direction: column; gap: 14px; min-width: 110px; }
+    .tet-panel { background: var(--card); border: 2px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
+    .tet-panel h3 { color: var(--dim); font-size: 0.78rem; margin-bottom: 5px; letter-spacing: 1px; }
+    .tet-panel .val { font-size: 1.4rem; font-weight: bold; }
 
-    /* ── SECTION COMMON ── */
-    section { padding: 100px 20px; }
-    .section-inner { max-width: 1100px; margin: 0 auto; }
-    .section-label {
-      font-size: 0.78rem;
-      letter-spacing: 3px;
-      color: var(--cyan);
-      text-transform: uppercase;
-      margin-bottom: 12px;
+    @media (max-width: 600px) {
+      .game-card { width: 45%; min-width: 140px; padding: 20px 12px; }
+      #tet-wrap { flex-direction: column; align-items: center; }
     }
-    .section-title {
-      font-size: clamp(2rem, 5vw, 3rem);
-      font-weight: 800;
-      margin-bottom: 16px;
-    }
-    .section-desc {
-      color: #7777aa;
-      max-width: 560px;
-      font-size: 1rem;
-    }
-
-    /* ── FEATURES ── */
-    #features { background: #0d0d22; }
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px;
-      margin-top: 56px;
-    }
-    .feature-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px;
-      transition: border-color 0.3s, transform 0.3s;
-    }
-    .feature-card:hover { border-color: var(--cyan); transform: translateY(-4px); }
-    .feature-icon {
-      font-size: 2.2rem;
-      margin-bottom: 16px;
-    }
-    .feature-card h3 { font-size: 1.1rem; margin-bottom: 8px; }
-    .feature-card p { color: #6666aa; font-size: 0.93rem; }
-
-    /* ── HOW TO PLAY ── */
-    #howto { background: var(--dark); }
-    .howto-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 60px;
-      align-items: center;
-      margin-top: 56px;
-    }
-    @media (max-width: 768px) {
-      .howto-layout { grid-template-columns: 1fr; }
-      nav { padding: 14px 24px; }
-      .nav-links { display: none; }
-    }
-    .howto-steps { display: flex; flex-direction: column; gap: 24px; }
-    .step {
-      display: flex;
-      gap: 20px;
-      align-items: flex-start;
-    }
-    .step-num {
-      flex-shrink: 0;
-      width: 40px; height: 40px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--cyan), var(--pink));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 1rem;
-    }
-    .step-body h4 { font-size: 1rem; margin-bottom: 4px; }
-    .step-body p { color: #6666aa; font-size: 0.9rem; }
-
-    .controls-box {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px;
-    }
-    .controls-box h3 { font-size: 1rem; color: var(--cyan); margin-bottom: 20px; letter-spacing: 1px; }
-    .control-row {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .control-row:last-child { border-bottom: none; }
-    .key {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: #1a1a35;
-      border: 1px solid #333;
-      border-radius: 6px;
-      padding: 5px 12px;
-      font-size: 0.82rem;
-      font-family: monospace;
-      color: #ccc;
-      min-width: 60px;
-      box-shadow: 0 3px 0 #111;
-    }
-    .control-label { color: #8888bb; font-size: 0.9rem; }
-
-    /* ── SCORING ── */
-    #scoring { background: #0d0d22; }
-    .scoring-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      margin-top: 56px;
-    }
-    .score-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 28px 24px;
-      text-align: center;
-    }
-    .score-card .score-val {
-      font-size: 2.4rem;
-      font-weight: 900;
-      background: linear-gradient(90deg, var(--cyan), var(--pink));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      line-height: 1;
-      margin-bottom: 8px;
-    }
-    .score-card .score-label { color: #aaa; font-size: 0.85rem; }
-    .score-card .score-desc { color: #555; font-size: 0.78rem; margin-top: 6px; }
-
-    /* brick demo */
-    .brick-demo {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-top: 48px;
-    }
-    .brick-row-demo { display: flex; gap: 6px; justify-content: center; }
-    .brick-demo-item {
-      height: 22px;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #fff;
-      flex: 1;
-      max-width: 80px;
-    }
-
-    /* ── CTA ── */
-    #cta {
-      background: var(--dark);
-      text-align: center;
-    }
-    .cta-box {
-      max-width: 700px;
-      margin: 0 auto;
-      background: linear-gradient(135deg, #00d4ff0d, #ff00aa0d);
-      border: 1px solid #00d4ff22;
-      border-radius: 24px;
-      padding: 80px 40px;
-    }
-    .cta-box h2 {
-      font-size: 2.5rem;
-      font-weight: 900;
-      margin-bottom: 16px;
-    }
-    .cta-box p { color: #7777aa; margin-bottom: 36px; }
-
-    /* ── FOOTER ── */
-    footer {
-      background: #080814;
-      border-top: 1px solid var(--border);
-      padding: 40px 60px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    footer .logo {
-      font-weight: 800;
-      letter-spacing: 3px;
-      font-size: 1rem;
-      background: linear-gradient(90deg, var(--cyan), var(--pink));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    footer p { color: #444; font-size: 0.82rem; }
-
-    /* ── ANIMATIONS ── */
-    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-    .float { animation: float 4s ease-in-out infinite; }
-
-    @keyframes glow-pulse {
-      0%,100% { box-shadow: 0 0 30px #00d4ff33; }
-      50%      { box-shadow: 0 0 60px #00d4ff66; }
-    }
-    .glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
-
-    /* scroll reveal */
-    .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
   </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <div class="nav-logo">BREAKOUT</div>
-  <ul class="nav-links">
-    <li><a href="#features">특징</a></li>
-    <li><a href="#howto">조작법</a></li>
-    <li><a href="#scoring">점수체계</a></li>
-    <li><a href="game.html" class="nav-cta">게임 시작 →</a></li>
-  </ul>
-</nav>
-
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-bg"></div>
-  <div class="hero-badge">🎮 ARCADE CLASSIC · 브라우저 게임</div>
-  <h1>BREAKOUT</h1>
-  <p>클래식 아케이드 블록 깨기의 현대적 재해석.<br>마우스 하나로 즐기는 스피드 & 전략 게임.</p>
-  <div class="hero-btns">
-    <a href="game.html" class="btn-primary glow-pulse">지금 플레이하기 →</a>
-    <a href="#features" class="btn-secondary">게임 소개 보기</a>
+<!-- HUB -->
+<div id="hub">
+  <div class="hub-header">
+    <h1>미니게임 허브</h1>
+    <p>5가지 클래식 게임을 즐겨보세요</p>
   </div>
-
-  <!-- mini canvas preview -->
-  <div class="hero-preview float reveal">
-    <div class="preview-label">LIVE PREVIEW</div>
-    <canvas id="preview" width="480" height="300"></canvas>
-  </div>
-</section>
-
-<!-- FEATURES -->
-<section id="features">
-  <div class="section-inner">
-    <div class="reveal">
-      <div class="section-label">Features</div>
-      <h2 class="section-title">왜 BREAKOUT인가?</h2>
-      <p class="section-desc">설치 없이 브라우저만 있으면 됩니다. 누구나 5초 안에 시작할 수 있는 순수한 아케이드 경험.</p>
+  <div class="game-grid">
+    <div class="game-card" onclick="launchGame('breakout')">
+      <div class="icon">🧱</div><h2>브레이크아웃</h2><p>볼로 벽돌을 모두 깨세요</p>
     </div>
-    <div class="features-grid reveal">
-      <div class="feature-card">
-        <div class="feature-icon">⚡</div>
-        <h3>즉각적인 시작</h3>
-        <p>설치 불필요. HTML 파일 하나로 바로 실행되는 완전한 게임 경험.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🎯</div>
-        <h3>레벨 시스템</h3>
-        <p>블록을 모두 부수면 다음 레벨로 진행. 레벨이 높아질수록 공 속도가 증가해 도전감을 높입니다.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">💎</div>
-        <h3>내구도 블록</h3>
-        <p>HP 1~3짜리 다양한 블록 등장. 여러 번 쳐야 파괴되는 강화 블록이 전략적 플레이를 유도합니다.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">✨</div>
-        <h3>파티클 이펙트</h3>
-        <p>블록 파괴 시 화려한 파티클 폭발. 타격감을 극대화하는 시각 피드백.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🖱️</div>
-        <h3>직관적 조작</h3>
-        <p>마우스를 움직이기만 해도 패들이 따라옵니다. 방향키도 지원하여 편한 방식으로 플레이 가능.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">❤️</div>
-        <h3>목숨 시스템</h3>
-        <p>목숨 3개로 시작. 공을 놓칠 때마다 차감되며, 모두 소진되면 게임 오버.</p>
-      </div>
+    <div class="game-card" onclick="launchGame('snake')">
+      <div class="icon">🐍</div><h2>스네이크</h2><p>먹이를 먹으며 뱀을 키우세요</p>
+    </div>
+    <div class="game-card" onclick="launchGame('tetris')">
+      <div class="icon">🟦</div><h2>테트리스</h2><p>블록을 쌓아 줄을 없애세요</p>
+    </div>
+    <div class="game-card" onclick="launchGame('2048')">
+      <div class="icon">🔢</div><h2>2048</h2><p>타일을 합쳐 2048을 만드세요</p>
+    </div>
+    <div class="game-card" onclick="launchGame('minesweeper')">
+      <div class="icon">💣</div><h2>지뢰찾기</h2><p>지뢰를 피해 모든 칸을 여세요</p>
     </div>
   </div>
-</section>
+</div>
 
-<!-- HOW TO PLAY -->
-<section id="howto">
-  <div class="section-inner">
-    <div class="reveal">
-      <div class="section-label">How to Play</div>
-      <h2 class="section-title">이렇게 플레이하세요</h2>
-    </div>
-    <div class="howto-layout">
-      <div class="howto-steps reveal">
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-body">
-            <h4>게임 시작</h4>
-            <p>"시작하기" 버튼을 클릭하면 게임이 시작됩니다. 공은 패들 위에 대기 상태입니다.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-body">
-            <h4>공 발사</h4>
-            <p>Space 키 또는 마우스 클릭으로 공을 발사합니다. 패들 위치에 따라 발사 각도가 달라집니다.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-body">
-            <h4>블록 파괴</h4>
-            <p>공이 블록에 맞으면 튕겨나옵니다. HP가 높은 블록은 여러 번 충돌해야 파괴됩니다.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">4</div>
-          <div class="step-body">
-            <h4>레벨 클리어</h4>
-            <p>모든 블록을 파괴하면 레벨 클리어! 다음 레벨은 공이 더 빠르게 움직입니다.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="controls-box reveal">
-        <h3>⌨️ 조작 키</h3>
-        <div class="control-row">
-          <span class="key">←</span>
-          <span class="key">→</span>
-          <span class="control-label">패들 좌우 이동</span>
-        </div>
-        <div class="control-row">
-          <span class="key">SPACE</span>
-          <span class="control-label">공 발사</span>
-        </div>
-        <div class="control-row">
-          <span class="key">🖱️ 이동</span>
-          <span class="control-label">마우스로 패들 조종</span>
-        </div>
-        <div class="control-row">
-          <span class="key">🖱️ 클릭</span>
-          <span class="control-label">공 발사 (마우스 모드)</span>
-        </div>
-
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
-          <h3 style="margin-bottom:14px;">💡 팁</h3>
-          <p style="color:#5555aa; font-size:0.88rem; line-height:1.7;">
-            패들 가장자리에 맞히면 공이 날카로운 각도로 튕겨나갑니다.<br>
-            중앙에 맞히면 직각에 가깝게 반사됩니다.<br>
-            윗줄 블록일수록 HP가 높으니 우선 공략하세요.
-          </p>
-        </div>
-      </div>
-    </div>
+<!-- GAME VIEW -->
+<div id="game-view">
+  <div class="topbar">
+    <button class="back-btn" onclick="exitGame()">← 허브로</button>
+    <span class="game-title" id="game-title-label"></span>
   </div>
-</section>
 
-<!-- SCORING -->
-<section id="scoring">
-  <div class="section-inner">
-    <div class="reveal">
-      <div class="section-label">Scoring</div>
-      <h2 class="section-title">점수 체계</h2>
-      <p class="section-desc">더 높은 HP의 블록, 더 높은 레벨에서의 파괴가 더 많은 점수를 줍니다.</p>
-    </div>
-    <div class="scoring-grid reveal">
-      <div class="score-card">
-        <div class="score-val">+10</div>
-        <div class="score-label">HP 1 블록 파괴</div>
-        <div class="score-desc">× 현재 레벨 배수 적용</div>
-      </div>
-      <div class="score-card">
-        <div class="score-val">+20</div>
-        <div class="score-label">HP 2 블록 파괴</div>
-        <div class="score-desc">× 현재 레벨 배수 적용</div>
-      </div>
-      <div class="score-card">
-        <div class="score-val">+30</div>
-        <div class="score-label">HP 3 블록 파괴</div>
-        <div class="score-desc">× 현재 레벨 배수 적용</div>
-      </div>
-      <div class="score-card">
-        <div class="score-val">+5</div>
-        <div class="score-label">블록 타격 (미파괴)</div>
-        <div class="score-desc">HP 감소 시마다 획득</div>
+  <!-- BREAKOUT -->
+  <div id="breakout-container" class="game-container">
+    <div class="info-row">점수: <span id="bo-score">0</span> &nbsp;|&nbsp; 레벨: <span id="bo-level">1</span> &nbsp;|&nbsp; 목숨: <span id="bo-lives">❤️❤️❤️</span></div>
+    <div style="position:relative">
+      <canvas id="bo-canvas" width="600" height="480"></canvas>
+      <div class="overlay" id="bo-overlay">
+        <h2 id="bo-ot">BREAKOUT</h2>
+        <p id="bo-om">마우스 또는 방향키로 패들을 조종하세요</p>
+        <button class="btn" id="bo-btn" onclick="boStart()">시작하기</button>
       </div>
     </div>
-
-    <!-- brick color guide -->
-    <div class="reveal" style="margin-top:56px;">
-      <h3 style="color:#aaa; font-size:0.9rem; letter-spacing:2px; margin-bottom:20px;">블록 색상 & HP 가이드</h3>
-      <div class="brick-demo">
-        <div class="brick-row-demo">
-          <div class="brick-demo-item" style="background:linear-gradient(#00ccff,#0088cc)">HP 3</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#00ccff,#0088cc)">HP 3</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#00ccff,#0088cc)">HP 3</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#00ccff,#0088cc)">HP 3</div>
-        </div>
-        <div class="brick-row-demo">
-          <div class="brick-demo-item" style="background:linear-gradient(#44ff88,#22cc55)">HP 2</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#44ff88,#22cc55)">HP 2</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#44ff88,#22cc55)">HP 2</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#44ff88,#22cc55)">HP 2</div>
-        </div>
-        <div class="brick-row-demo">
-          <div class="brick-demo-item" style="background:linear-gradient(#ffdd00,#ccaa00)">HP 1</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#ffdd00,#ccaa00)">HP 1</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#ffdd00,#ccaa00)">HP 1</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#ffdd00,#ccaa00)">HP 1</div>
-        </div>
-        <div class="brick-row-demo">
-          <div class="brick-demo-item" style="background:linear-gradient(#ff8822,#cc6600)">HP 1</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#ff8822,#cc6600)">HP 1</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#ff8822,#cc6600)">HP 1</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#ff8822,#cc6600)">HP 1</div>
-        </div>
-        <div class="brick-row-demo">
-          <div class="brick-demo-item" style="background:linear-gradient(#ff4466,#cc2244)">HP 1</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#ff4466,#cc2244)">HP 1</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#ff4466,#cc2244)">HP 1</div>
-          <div class="brick-demo-item" style="background:linear-gradient(#ff4466,#cc2244)">HP 1</div>
-        </div>
-      </div>
-      <p style="color:#444; font-size:0.82rem; margin-top:14px; text-align:center;">위 줄일수록 HP가 높습니다. 숫자가 표시된 블록은 추가 타격이 필요합니다.</p>
-    </div>
+    <div class="hint">← → 방향키 / 마우스 이동 &nbsp;|&nbsp; Space / 클릭: 발사</div>
   </div>
-</section>
 
-<!-- CTA -->
-<section id="cta">
-  <div class="section-inner">
-    <div class="cta-box reveal">
-      <h2>지금 바로 플레이하세요</h2>
-      <p>설치 없이, 로그인 없이. 브라우저만 있으면 바로 시작할 수 있습니다.</p>
-      <a href="game.html" class="btn-primary" style="font-size:1.1rem; padding:16px 48px;">게임 시작하기 →</a>
+  <!-- SNAKE -->
+  <div id="snake-container" class="game-container">
+    <div class="info-row">점수: <span id="sn-score">0</span> &nbsp;|&nbsp; 최고: <span id="sn-best">0</span></div>
+    <div style="position:relative">
+      <canvas id="sn-canvas" width="400" height="400"></canvas>
+      <div class="overlay" id="sn-overlay">
+        <h2 id="sn-ot">스네이크</h2>
+        <p id="sn-om">방향키로 뱀을 조종하세요</p>
+        <button class="btn" onclick="snStart()">시작하기</button>
+      </div>
     </div>
+    <div class="hint">방향키 / WASD 이동</div>
   </div>
-</section>
 
-<!-- FOOTER -->
-<footer>
-  <div class="logo">BREAKOUT</div>
-  <p>HTML5 Canvas · Pure JavaScript · No Dependencies</p>
-  <p style="color:#333;">2026 · 브라우저 아케이드 게임</p>
-</footer>
+  <!-- TETRIS -->
+  <div id="tetris-container" class="game-container">
+    <div id="tet-wrap">
+      <div style="position:relative">
+        <canvas id="tet-canvas" width="240" height="480"></canvas>
+        <div class="overlay" id="tet-overlay">
+          <h2 id="tet-ot">테트리스</h2>
+          <p id="tet-om">방향키로 블록을 조종하세요</p>
+          <button class="btn" onclick="tetStart()">시작하기</button>
+        </div>
+      </div>
+      <div id="tet-side">
+        <div class="tet-panel"><h3>NEXT</h3><canvas id="tet-next" width="80" height="80"></canvas></div>
+        <div class="tet-panel"><h3>SCORE</h3><div class="val" id="tet-score">0</div></div>
+        <div class="tet-panel"><h3>LEVEL</h3><div class="val" id="tet-level">1</div></div>
+        <div class="tet-panel"><h3>LINES</h3><div class="val" id="tet-lines">0</div></div>
+      </div>
+    </div>
+    <div class="hint">← → 이동 &nbsp;|&nbsp; ↑/Z 회전 &nbsp;|&nbsp; ↓ 빠르게 &nbsp;|&nbsp; Space 즉시낙하</div>
+  </div>
 
-<!-- PREVIEW CANVAS ANIMATION -->
+  <!-- 2048 -->
+  <div id="2048-container" class="game-container">
+    <div class="info-row">점수: <span id="g2-score">0</span> &nbsp;|&nbsp; 최고: <span id="g2-best">0</span>
+      &nbsp;|&nbsp; <button class="btn" style="padding:4px 16px;font-size:.85rem" onclick="g2Init()">새 게임</button>
+    </div>
+    <div id="g2-board"></div>
+    <div id="g2-msg"></div>
+    <div class="hint">방향키로 타일 이동 | 같은 숫자가 합쳐집니다</div>
+  </div>
+
+  <!-- MINESWEEPER -->
+  <div id="minesweeper-container" class="game-container">
+    <div class="info-row">
+      💣 <span id="ms-left">10</span> &nbsp;|&nbsp; ⏱ <span id="ms-time">0</span>s
+      &nbsp;|&nbsp; <button class="btn" style="padding:4px 16px;font-size:.85rem" onclick="msInit()">새 게임</button>
+    </div>
+    <div id="ms-board"></div>
+    <div id="ms-result"></div>
+    <div class="hint">좌클릭: 열기 &nbsp;|&nbsp; 우클릭: 깃발</div>
+  </div>
+</div>
+
 <script>
-(function() {
-  const c = document.getElementById('preview');
-  const ctx = c.getContext('2d');
-  const W = c.width, H = c.height;
-  const COLS = 8, ROWS = 4;
-  const BW = 52, BH = 16, PAD = 4;
-  const OX = (W - (BW + PAD) * COLS + PAD) / 2, OY = 30;
-  const COLORS = [
-    ['#00ccff','#0088cc'],['#44ff88','#22cc55'],
-    ['#ffdd00','#ccaa00'],['#ff4466','#cc2244'],
-  ];
+/* ── HUB ── */
+let activeGame = null;
+const TITLES = { breakout:'🧱 브레이크아웃', snake:'🐍 스네이크', tetris:'🟦 테트리스', '2048':'🔢 2048', minesweeper:'💣 지뢰찾기' };
+const INITS   = { breakout:boInit, snake:snInit, tetris:tetInit, '2048':g2Init, minesweeper:msInit };
+const STOPS   = { breakout:boStop, snake:snStop, tetris:tetStop, '2048':()=>{}, minesweeper:msStop };
 
-  let bricks = [];
-  function resetBricks() {
-    bricks = [];
-    for (let r = 0; r < ROWS; r++)
-      for (let c2 = 0; c2 < COLS; c2++)
-        bricks.push({ x: OX + c2*(BW+PAD), y: OY + r*(BH+PAD), row: r, alive: true });
+function launchGame(name) {
+  document.getElementById('hub').style.display = 'none';
+  const gv = document.getElementById('game-view');
+  gv.style.display = 'flex';
+  document.querySelectorAll('.game-container').forEach(el => el.style.display = 'none');
+  document.getElementById(name + '-container').style.display = 'flex';
+  document.getElementById('game-title-label').textContent = TITLES[name];
+  activeGame = name;
+  INITS[name]();
+}
+
+function exitGame() {
+  if (activeGame) STOPS[activeGame]();
+  activeGame = null;
+  document.getElementById('game-view').style.display = 'none';
+  document.getElementById('hub').style.display = 'flex';
+}
+
+/* ════════════════════════════════════════════
+   BREAKOUT
+════════════════════════════════════════════ */
+const boC  = document.getElementById('bo-canvas');
+const boX  = boC.getContext('2d');
+const BW=600,BH=480,BPW=100,BPH=12,BPY=440,BBR=8;
+const BR=5,BC=10,BRICKW=52,BRICKH=18,BRICKP=4;
+const BOFFX=(BW-(BRICKW+BRICKP)*BC+BRICKP)/2, BOFFY=50;
+const BCOLS=[['#ff4466','#cc2244'],['#ff8822','#cc6600'],['#ffdd00','#ccaa00'],['#44ff88','#22cc55'],['#00ccff','#0088cc']];
+
+let boState,boPad,boBall,boBricks,boScore,boLives,boLvl,boRaf,boMX=BW/2,boPtcl=[],boKeys={};
+
+function boInit(){
+  boScore=0;boLives=3;boLvl=1;boPtcl=[];
+  boInitLevel();
+  document.getElementById('bo-overlay').style.display='block';
+  document.getElementById('bo-ot').textContent='BREAKOUT';
+  document.getElementById('bo-om').textContent='마우스 또는 방향키로 패들을 조종하세요';
+  document.getElementById('bo-btn').onclick=boStart;
+  boState='overlay'; boDrawStatic();
+}
+function boInitLevel(){
+  boPad={x:BW/2-BPW/2,y:BPY,w:BPW};
+  boBall={x:BW/2,y:BPY-BBR-2,vx:(Math.random()>.5?1:-1)*(3+boLvl*.4),vy:-(4+boLvl*.4),launched:false};
+  boBricks=[];
+  for(let r=0;r<BR;r++)for(let c=0;c<BC;c++){
+    const hp=(BR-r>2)?1:(BR-r>1)?2:3;
+    boBricks.push({x:BOFFX+c*(BRICKW+BRICKP),y:BOFFY+r*(BRICKH+BRICKP),w:BRICKW,h:BRICKH,row:r,hp,maxHp:hp,alive:true});
   }
-  resetBricks();
+  boUpdateUI();
+}
+function boUpdateUI(){
+  document.getElementById('bo-score').textContent=boScore;
+  document.getElementById('bo-level').textContent=boLvl;
+  document.getElementById('bo-lives').textContent='❤️'.repeat(boLives);
+}
+function boStart(){
+  document.getElementById('bo-overlay').style.display='none';
+  boState='playing'; boLoop();
+}
+function boStop(){ boState='stopped'; cancelAnimationFrame(boRaf); }
 
-  let px = W/2 - 50, ball = { x: W/2, y: H-60, vx: 2.8, vy: -2.8 };
-  let particles = [];
+function boLoop(){
+  if(boState!=='playing')return;
+  boUpdate(); boDraw();
+  boRaf=requestAnimationFrame(boLoop);
+}
+function boDrawStatic(){ boDrawBG(); boBricks.forEach(boDrawBrick); boDrawPad(); boDrawBall(); }
 
-  function spawnP(x, y, col) {
-    for (let i = 0; i < 6; i++) {
-      const a = Math.random()*Math.PI*2, s = 1+Math.random()*2.5;
-      particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, col });
+function boUpdate(){
+  if(boKeys.ArrowLeft) boPad.x=Math.max(0,boPad.x-7);
+  if(boKeys.ArrowRight) boPad.x=Math.min(BW-boPad.w,boPad.x+7);
+  if(!boKeys.ArrowLeft&&!boKeys.ArrowRight){
+    boPad.x+=(boMX-boPad.w/2-boPad.x)*.15;
+    boPad.x=Math.max(0,Math.min(BW-boPad.w,boPad.x));
+  }
+  if(!boBall.launched){boBall.x=boPad.x+boPad.w/2;return;}
+  boBall.x+=boBall.vx; boBall.y+=boBall.vy;
+  if(boBall.x-BBR<0){boBall.x=BBR;boBall.vx=Math.abs(boBall.vx);}
+  if(boBall.x+BBR>BW){boBall.x=BW-BBR;boBall.vx=-Math.abs(boBall.vx);}
+  if(boBall.y-BBR<0){boBall.y=BBR;boBall.vy=Math.abs(boBall.vy);}
+  if(boBall.vy>0&&boBall.y+BBR>=boPad.y&&boBall.y+BBR<=boPad.y+BPH+4&&boBall.x>=boPad.x&&boBall.x<=boPad.x+boPad.w){
+    const rel=(boBall.x-boPad.x)/boPad.w-.5,spd=Math.hypot(boBall.vx,boBall.vy),ang=rel*(Math.PI/3);
+    boBall.vx=spd*Math.sin(ang); boBall.vy=-spd*Math.cos(ang); boBall.y=boPad.y-BBR;
+  }
+  if(boBall.y-BBR>BH){
+    boLives--;boUpdateUI();
+    if(boLives<=0){
+      boState='overlay';cancelAnimationFrame(boRaf);
+      document.getElementById('bo-ot').textContent='GAME OVER';
+      document.getElementById('bo-om').textContent='최종 점수: '+boScore;
+      document.getElementById('bo-btn').textContent='다시 시작';
+      document.getElementById('bo-btn').onclick=()=>{boScore=0;boLives=3;boLvl=1;boInitLevel();boStart();};
+      document.getElementById('bo-overlay').style.display='block';
+      return;
+    }
+    boBall={x:boPad.x+boPad.w/2,y:boPad.y-BBR-2,vx:(Math.random()>.5?1:-1)*(3+boLvl*.4),vy:-(4+boLvl*.4),launched:false};
+  }
+  for(const b of boBricks){
+    if(!b.alive)continue;
+    if(boBall.x+BBR>b.x&&boBall.x-BBR<b.x+b.w&&boBall.y+BBR>b.y&&boBall.y-BBR<b.y+b.h){
+      b.hp--;
+      if(b.hp<=0){b.alive=false;boScore+=(b.maxHp*10)*boLvl;boSpawnP(b.x+b.w/2,b.y+b.h/2,BCOLS[b.row%5][0]);}
+      else boScore+=5;
+      boUpdateUI();
+      const ox=(boBall.vx>0)?(boBall.x+BBR-b.x):(b.x+b.w-(boBall.x-BBR));
+      const oy=(boBall.vy>0)?(boBall.y+BBR-b.y):(b.y+b.h-(boBall.y-BBR));
+      if(ox<oy)boBall.vx=-boBall.vx;else boBall.vy=-boBall.vy;
+      break;
     }
   }
-
-  function frame() {
-    // bg
-    ctx.fillStyle = '#0d0d20';
-    ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = '#ffffff06';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-    for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-
-    // bricks
-    for (const b of bricks) {
-      if (!b.alive) continue;
-      const [f, d] = COLORS[b.row % COLORS.length];
-      const g = ctx.createLinearGradient(b.x, b.y, b.x, b.y+b.h||BH);
-      g.addColorStop(0, f); g.addColorStop(1, d);
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.roundRect(b.x, b.y, BW, BH, 3);
-      ctx.fill();
-    }
-
-    // paddle
-    px = W/2 - 50 + Math.sin(Date.now()/900) * 100;
-    px = Math.max(0, Math.min(W-100, px));
-    const pg = ctx.createLinearGradient(px, 0, px+100, 0);
-    pg.addColorStop(0, '#00d4ff'); pg.addColorStop(1, '#ff00aa');
-    ctx.fillStyle = pg;
-    ctx.beginPath();
-    ctx.roundRect(px, H-35, 100, 10, 5);
-    ctx.fill();
-
-    // ball
-    ball.x += ball.vx; ball.y += ball.vy;
-    if (ball.x < 7) { ball.x = 7; ball.vx = Math.abs(ball.vx); }
-    if (ball.x > W-7) { ball.x = W-7; ball.vx = -Math.abs(ball.vx); }
-    if (ball.y < 7) { ball.y = 7; ball.vy = Math.abs(ball.vy); }
-    if (ball.vy > 0 && ball.y+7 >= H-35 && ball.x >= px && ball.x <= px+100) {
-      ball.vy = -Math.abs(ball.vy); ball.y = H-42;
-    }
-    if (ball.y > H+20) { ball.y = H-60; ball.x = W/2; ball.vy = -2.8; }
-
-    for (const b of bricks) {
-      if (!b.alive) continue;
-      if (ball.x+7>b.x && ball.x-7<b.x+BW && ball.y+7>b.y && ball.y-7<b.y+BH) {
-        b.alive = false;
-        spawnP(b.x+BW/2, b.y+BH/2, COLORS[b.row%COLORS.length][0]);
-        ball.vy = -ball.vy;
-      }
-    }
-    if (bricks.every(b=>!b.alive)) resetBricks();
-
-    // particles
-    particles = particles.filter(p=>p.life>0);
-    for (const p of particles) {
-      p.x+=p.vx; p.y+=p.vy; p.life-=0.04;
-      ctx.globalAlpha = p.life;
-      ctx.fillStyle = p.col;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 2.5*p.life, 0, Math.PI*2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-
-    // ball draw
-    const bg = ctx.createRadialGradient(ball.x-1, ball.y-1, 1, ball.x, ball.y, 7);
-    bg.addColorStop(0, '#fff'); bg.addColorStop(1, '#00d4ff');
-    ctx.fillStyle = bg;
-    ctx.beginPath(); ctx.arc(ball.x, ball.y, 7, 0, Math.PI*2); ctx.fill();
-
-    requestAnimationFrame(frame);
+  if(boBricks.every(b=>!b.alive)){
+    boLvl++;boState='overlay';cancelAnimationFrame(boRaf);boInitLevel();
+    document.getElementById('bo-ot').textContent='LEVEL CLEAR!';
+    document.getElementById('bo-om').textContent='레벨 '+boLvl+' 시작합니다!';
+    document.getElementById('bo-btn').textContent='계속하기';
+    document.getElementById('bo-btn').onclick=boStart;
+    document.getElementById('bo-overlay').style.display='block';
   }
-  frame();
-})();
+}
+function boSpawnP(x,y,col){
+  for(let i=0;i<8;i++){const a=Math.random()*Math.PI*2,s=1+Math.random()*3;boPtcl.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,col});}
+}
+function boDrawBG(){
+  boX.fillStyle='#0d0d20';boX.fillRect(0,0,BW,BH);
+  boX.strokeStyle='#ffffff08';boX.lineWidth=1;
+  for(let x=0;x<BW;x+=40){boX.beginPath();boX.moveTo(x,0);boX.lineTo(x,BH);boX.stroke();}
+  for(let y=0;y<BH;y+=40){boX.beginPath();boX.moveTo(0,y);boX.lineTo(BW,y);boX.stroke();}
+}
+function boDrawBrick(b){
+  if(!b.alive)return;
+  const[f,d]=BCOLS[b.row%5],a=b.hp/b.maxHp;
+  boX.globalAlpha=.5+.5*a;
+  const g=boX.createLinearGradient(b.x,b.y,b.x,b.y+b.h);g.addColorStop(0,f);g.addColorStop(1,d);
+  boX.fillStyle=g;boX.beginPath();boX.roundRect(b.x,b.y,b.w,b.h,4);boX.fill();
+  boX.globalAlpha=.3*a;boX.strokeStyle='#fff';boX.lineWidth=1;boX.stroke();boX.globalAlpha=1;
+  if(b.maxHp>1){boX.fillStyle='#fff';boX.font='bold 10px sans-serif';boX.textAlign='center';boX.fillText(b.hp,b.x+b.w/2,b.y+b.h/2+4);}
+}
+function boDrawPad(){
+  const g=boX.createLinearGradient(boPad.x,boPad.y,boPad.x+boPad.w,boPad.y);
+  g.addColorStop(0,'#00d4ff');g.addColorStop(1,'#ff00aa');
+  boX.fillStyle=g;boX.beginPath();boX.roundRect(boPad.x,boPad.y,boPad.w,BPH,6);boX.fill();
+  boX.fillStyle='#ffffff44';boX.fillRect(boPad.x+6,boPad.y+3,boPad.w-12,3);
+}
+function boDrawBall(){
+  const g=boX.createRadialGradient(boBall.x-2,boBall.y-2,1,boBall.x,boBall.y,BBR);
+  g.addColorStop(0,'#fff');g.addColorStop(1,'#00d4ff');
+  boX.fillStyle=g;boX.beginPath();boX.arc(boBall.x,boBall.y,BBR,0,Math.PI*2);boX.fill();
+}
+function boDraw(){
+  boDrawBG();
+  boBricks.forEach(boDrawBrick);
+  boPtcl=boPtcl.filter(p=>p.life>0);
+  boPtcl.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life-=.05;boX.globalAlpha=p.life;boX.fillStyle=p.col;boX.beginPath();boX.arc(p.x,p.y,3*p.life,0,Math.PI*2);boX.fill();});
+  boX.globalAlpha=1;
+  boDrawPad();boDrawBall();
+}
+boC.addEventListener('mousemove',e=>{const r=boC.getBoundingClientRect();boMX=e.clientX-r.left;});
+boC.addEventListener('click',()=>{if(boBall&&!boBall.launched)boBall.launched=true;});
+document.addEventListener('keydown',e=>{
+  if(activeGame!=='breakout')return;
+  boKeys[e.code]=true;
+  if(e.code==='Space'&&boBall&&!boBall.launched)boBall.launched=true;
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();
+});
+document.addEventListener('keyup',e=>{boKeys[e.code]=false;});
 
-// Scroll reveal
-const reveals = document.querySelectorAll('.reveal');
-const obs = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-}, { threshold: 0.12 });
-reveals.forEach(el => obs.observe(el));
+/* ════════════════════════════════════════════
+   SNAKE
+════════════════════════════════════════════ */
+const snC=document.getElementById('sn-canvas'),snX=snC.getContext('2d');
+const SG=20,SC=20;
+let snSnake,snDir,snNDir,snFood,snScore2,snBest=0,snIv,snRunning;
+
+function snInit(){
+  snStop();snScore2=0;
+  document.getElementById('sn-score').textContent=0;
+  document.getElementById('sn-best').textContent=snBest;
+  document.getElementById('sn-overlay').style.display='block';
+  document.getElementById('sn-ot').textContent='스네이크';
+  document.getElementById('sn-om').textContent='방향키 또는 WASD로 뱀을 조종하세요';
+  snX.fillStyle='#0d0d20';snX.fillRect(0,0,SG*SC,SG*SC);
+}
+function snStart(){
+  document.getElementById('sn-overlay').style.display='none';
+  snSnake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+  snDir={x:1,y:0};snNDir={x:1,y:0};snScore2=0;
+  document.getElementById('sn-score').textContent=0;
+  snSpawnFood();snRunning=true;
+  clearInterval(snIv);snIv=setInterval(snStep,150);
+}
+function snStop(){snRunning=false;clearInterval(snIv);}
+function snSpawnFood(){
+  let p;
+  do{p={x:Math.floor(Math.random()*SG),y:Math.floor(Math.random()*SG)};}
+  while(snSnake&&snSnake.some(s=>s.x===p.x&&s.y===p.y));
+  snFood=p;
+}
+function snStep(){
+  if(!snRunning)return;
+  snDir=snNDir;
+  const h={x:snSnake[0].x+snDir.x,y:snSnake[0].y+snDir.y};
+  if(h.x<0||h.x>=SG||h.y<0||h.y>=SG||snSnake.some(s=>s.x===h.x&&s.y===h.y)){snGameOver();return;}
+  snSnake.unshift(h);
+  if(h.x===snFood.x&&h.y===snFood.y){
+    snScore2+=10;document.getElementById('sn-score').textContent=snScore2;
+    if(snScore2>snBest){snBest=snScore2;document.getElementById('sn-best').textContent=snBest;}
+    snSpawnFood();
+    const spd=Math.max(70,150-Math.floor(snScore2/50)*10);
+    clearInterval(snIv);snIv=setInterval(snStep,spd);
+  }else snSnake.pop();
+  snDraw();
+}
+function snGameOver(){
+  snRunning=false;clearInterval(snIv);
+  document.getElementById('sn-ot').textContent='GAME OVER';
+  document.getElementById('sn-om').textContent='점수: '+snScore2;
+  const ov=document.getElementById('sn-overlay');
+  ov.querySelector('button').onclick=snStart;
+  ov.style.display='block';
+}
+function snDraw(){
+  snX.fillStyle='#0d0d20';snX.fillRect(0,0,SG*SC,SG*SC);
+  snX.strokeStyle='#ffffff08';snX.lineWidth=1;
+  for(let i=0;i<=SG;i++){snX.beginPath();snX.moveTo(i*SC,0);snX.lineTo(i*SC,SG*SC);snX.stroke();snX.beginPath();snX.moveTo(0,i*SC);snX.lineTo(SG*SC,i*SC);snX.stroke();}
+  snX.fillStyle='#ff4466';snX.shadowBlur=10;snX.shadowColor='#ff4466';
+  snX.beginPath();snX.arc(snFood.x*SC+SC/2,snFood.y*SC+SC/2,SC/2-2,0,Math.PI*2);snX.fill();
+  snX.shadowBlur=0;
+  snSnake.forEach((s,i)=>{
+    const t=1-i/snSnake.length;
+    snX.fillStyle=i===0?'#00ff88':`rgba(0,${Math.floor(140+t*115)},${Math.floor(t*136)},${.55+t*.45})`;
+    snX.beginPath();snX.roundRect(s.x*SC+1,s.y*SC+1,SC-2,SC-2,i===0?4:2);snX.fill();
+  });
+}
+document.addEventListener('keydown',e=>{
+  if(activeGame!=='snake')return;
+  const M={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},
+    KeyW:{x:0,y:-1},KeyS:{x:0,y:1},KeyA:{x:-1,y:0},KeyD:{x:1,y:0}};
+  const d=M[e.code];
+  if(d&&snRunning){if(d.x!==-snDir.x||d.y!==-snDir.y)snNDir=d;e.preventDefault();}
+  if(e.code==='Space'&&!snRunning){snStart();e.preventDefault();}
+});
+
+/* ════════════════════════════════════════════
+   TETRIS
+════════════════════════════════════════════ */
+const tetC=document.getElementById('tet-canvas'),tetX=tetC.getContext('2d');
+const tetNX=document.getElementById('tet-next').getContext('2d');
+const TC=10,TR=20,TS=24;
+const TPIECES=[
+  {s:[[1,1,1,1]],c:'#00d4ff'},
+  {s:[[1,1],[1,1]],c:'#ffdd00'},
+  {s:[[0,1,0],[1,1,1]],c:'#aa00ff'},
+  {s:[[0,1,1],[1,1,0]],c:'#44ff88'},
+  {s:[[1,1,0],[0,1,1]],c:'#ff4466'},
+  {s:[[1,0,0],[1,1,1]],c:'#0066ff'},
+  {s:[[0,0,1],[1,1,1]],c:'#ff8822'},
+];
+let tetBoard,tetCur,tetNxt,tetScore2,tetLvl,tetLines,tetRaf2,tetDrop,tetAccum,tetLast,tetRunning2;
+
+function tetInit(){
+  tetStop();
+  tetX.fillStyle='#0d0d20';tetX.fillRect(0,0,TC*TS,TR*TS);
+  document.getElementById('tet-overlay').style.display='block';
+  document.getElementById('tet-ot').textContent='테트리스';
+  document.getElementById('tet-om').textContent='방향키로 블록을 조종하세요';
+}
+function tetRand(){const p=TPIECES[Math.floor(Math.random()*7)];return{s:p.s.map(r=>[...r]),c:p.c};}
+function tetStart(){
+  document.getElementById('tet-overlay').style.display='none';
+  tetBoard=Array.from({length:TR},()=>Array(TC).fill(0));
+  tetScore2=0;tetLvl=1;tetLines=0;tetDrop=800;tetAccum=0;
+  tetNxt=tetRand();tetSpawn();tetUpdateUI();
+  tetRunning2=true;tetLast=performance.now();
+  tetRaf2=requestAnimationFrame(tetLoop);
+}
+function tetStop(){tetRunning2=false;cancelAnimationFrame(tetRaf2);}
+function tetSpawn(){
+  tetCur={...tetNxt,s:tetNxt.s.map(r=>[...r]),x:Math.floor((TC-tetNxt.s[0].length)/2),y:0};
+  tetNxt=tetRand();tetDrawNext();
+  if(tetHit(tetCur,tetCur.x,tetCur.y)){
+    tetRunning2=false;cancelAnimationFrame(tetRaf2);
+    document.getElementById('tet-ot').textContent='GAME OVER';
+    document.getElementById('tet-om').textContent='점수: '+tetScore2;
+    document.getElementById('tet-overlay').querySelector('button').onclick=tetStart;
+    document.getElementById('tet-overlay').style.display='block';
+  }
+}
+function tetHit(p,px,py){
+  for(let r=0;r<p.s.length;r++)for(let c=0;c<p.s[r].length;c++)if(p.s[r][c]){
+    const nx=px+c,ny=py+r;
+    if(nx<0||nx>=TC||ny>=TR)return true;
+    if(ny>=0&&tetBoard[ny][nx])return true;
+  }
+  return false;
+}
+function tetRot(s){
+  const R=s.length,C=s[0].length,res=Array.from({length:C},()=>Array(R).fill(0));
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++)res[c][R-1-r]=s[r][c];
+  return res;
+}
+function tetLock(){
+  for(let r=0;r<tetCur.s.length;r++)for(let c=0;c<tetCur.s[r].length;c++)
+    if(tetCur.s[r][c]){const ny=tetCur.y+r,nx=tetCur.x+c;if(ny>=0)tetBoard[ny][nx]=tetCur.c;}
+  let cleared=0;
+  for(let r=TR-1;r>=0;r--){
+    if(tetBoard[r].every(v=>v)){tetBoard.splice(r,1);tetBoard.unshift(Array(TC).fill(0));cleared++;r++;}
+  }
+  if(cleared){
+    tetScore2+=[0,100,300,500,800][cleared]*tetLvl;
+    tetLines+=cleared;tetLvl=Math.floor(tetLines/10)+1;
+    tetDrop=Math.max(80,800-(tetLvl-1)*80);tetUpdateUI();
+  }
+  tetSpawn();
+}
+function tetUpdateUI(){
+  document.getElementById('tet-score').textContent=tetScore2;
+  document.getElementById('tet-level').textContent=tetLvl;
+  document.getElementById('tet-lines').textContent=tetLines;
+}
+function tetDrawNext(){
+  tetNX.fillStyle='#0d0d20';tetNX.fillRect(0,0,80,80);
+  const s=tetNxt.s,cs=Math.min(16,Math.floor(56/Math.max(s.length,s[0].length)));
+  const ox=Math.floor((80-s[0].length*cs)/2),oy=Math.floor((80-s.length*cs)/2);
+  tetNX.fillStyle=tetNxt.c;
+  for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c])tetNX.fillRect(ox+c*cs+1,oy+r*cs+1,cs-2,cs-2);
+}
+function tetGhost(){let gy=tetCur.y;while(!tetHit(tetCur,tetCur.x,gy+1))gy++;return gy;}
+function tetDraw2(){
+  tetX.fillStyle='#0d0d20';tetX.fillRect(0,0,TC*TS,TR*TS);
+  tetX.strokeStyle='#ffffff08';tetX.lineWidth=1;
+  for(let c=0;c<=TC;c++){tetX.beginPath();tetX.moveTo(c*TS,0);tetX.lineTo(c*TS,TR*TS);tetX.stroke();}
+  for(let r=0;r<=TR;r++){tetX.beginPath();tetX.moveTo(0,r*TS);tetX.lineTo(TC*TS,r*TS);tetX.stroke();}
+  for(let r=0;r<TR;r++)for(let c=0;c<TC;c++)if(tetBoard[r][c]){
+    tetX.fillStyle=tetBoard[r][c];tetX.fillRect(c*TS+1,r*TS+1,TS-2,TS-2);
+    tetX.fillStyle='#ffffff33';tetX.fillRect(c*TS+2,r*TS+2,TS-4,4);
+  }
+  const gy=tetGhost();
+  tetX.globalAlpha=.2;
+  for(let r=0;r<tetCur.s.length;r++)for(let c=0;c<tetCur.s[r].length;c++)if(tetCur.s[r][c]){
+    tetX.fillStyle=tetCur.c;tetX.fillRect((tetCur.x+c)*TS+1,(gy+r)*TS+1,TS-2,TS-2);
+  }
+  tetX.globalAlpha=1;
+  for(let r=0;r<tetCur.s.length;r++)for(let c=0;c<tetCur.s[r].length;c++)if(tetCur.s[r][c]){
+    tetX.fillStyle=tetCur.c;tetX.fillRect((tetCur.x+c)*TS+1,(tetCur.y+r)*TS+1,TS-2,TS-2);
+    tetX.fillStyle='#ffffff55';tetX.fillRect((tetCur.x+c)*TS+2,(tetCur.y+r)*TS+2,TS-4,4);
+  }
+}
+function tetLoop(now){
+  if(!tetRunning2)return;
+  const dt=now-tetLast;tetLast=now;tetAccum+=dt;
+  if(tetAccum>=tetDrop){tetAccum-=tetDrop;if(tetHit(tetCur,tetCur.x,tetCur.y+1))tetLock();else tetCur.y++;}
+  tetDraw2();tetRaf2=requestAnimationFrame(tetLoop);
+}
+document.addEventListener('keydown',e=>{
+  if(activeGame!=='tetris')return;
+  if(!tetRunning2){if(e.code==='Space'||e.code==='Enter'){tetStart();e.preventDefault();}return;}
+  if(e.code==='ArrowLeft'){if(!tetHit(tetCur,tetCur.x-1,tetCur.y))tetCur.x--;e.preventDefault();}
+  if(e.code==='ArrowRight'){if(!tetHit(tetCur,tetCur.x+1,tetCur.y))tetCur.x++;e.preventDefault();}
+  if(e.code==='ArrowDown'){
+    if(!tetHit(tetCur,tetCur.x,tetCur.y+1)){tetCur.y++;tetAccum=0;}else tetLock();
+    e.preventDefault();
+  }
+  if(e.code==='ArrowUp'||e.code==='KeyZ'){
+    const rot=tetRot(tetCur.s);
+    for(const k of[0,-1,1,-2,2])if(!tetHit({...tetCur,s:rot},tetCur.x+k,tetCur.y)){tetCur.s=rot;tetCur.x+=k;break;}
+    e.preventDefault();
+  }
+  if(e.code==='Space'){tetCur.y=tetGhost();tetLock();e.preventDefault();}
+});
+
+/* ════════════════════════════════════════════
+   2048
+════════════════════════════════════════════ */
+const G2N=4;
+let g2Board,g2Score2,g2Best=0,g2Over,g2Won2;
+const G2C={
+  0:['#1a1a2e','#666'],2:['#2e3a5e','#eee'],4:['#2e4a5e','#eee'],
+  8:['#b05a10','#fff'],16:['#b03a10','#fff'],32:['#b01a10','#fff'],
+  64:['#900000','#fff'],128:['#c09000','#fff'],256:['#c0a000','#111'],
+  512:['#d0b000','#111'],1024:['#e0c000','#111'],2048:['#f0d000','#111']
+};
+function g2Init(){
+  g2Board=Array.from({length:G2N},()=>Array(G2N).fill(0));
+  g2Score2=0;g2Over=false;g2Won2=false;
+  document.getElementById('g2-score').textContent=0;
+  document.getElementById('g2-msg').textContent='';
+  g2Add();g2Add();g2Render();
+}
+function g2Add(){
+  const empty=[];
+  for(let r=0;r<G2N;r++)for(let c=0;c<G2N;c++)if(!g2Board[r][c])empty.push([r,c]);
+  if(!empty.length)return;
+  const[r,c]=empty[Math.floor(Math.random()*empty.length)];
+  g2Board[r][c]=Math.random()<.9?2:4;
+}
+function g2Render(){
+  const bd=document.getElementById('g2-board');bd.innerHTML='';
+  for(let r=0;r<G2N;r++)for(let c=0;c<G2N;c++){
+    const v=g2Board[r][c],tile=document.createElement('div');
+    tile.className='tile';
+    const[bg,fg]=G2C[Math.min(v,2048)]||['#555','#fff'];
+    tile.style.background=bg;tile.style.color=fg;
+    tile.style.fontSize=v>=1000?'1.2rem':v>=100?'1.5rem':'1.8rem';
+    if(v)tile.textContent=v;
+    bd.appendChild(tile);
+  }
+  document.getElementById('g2-score').textContent=g2Score2;
+  if(g2Score2>g2Best){g2Best=g2Score2;document.getElementById('g2-best').textContent=g2Best;}
+}
+function g2Move(dir){
+  if(g2Over)return;
+  const merge=line=>{
+    let a=line.filter(v=>v);
+    for(let i=0;i<a.length-1;i++)if(a[i]===a[i+1]){a[i]*=2;g2Score2+=a[i];if(a[i]===2048&&!g2Won2)g2Won2=true;a.splice(i+1,1);i++;}
+    while(a.length<G2N)a.push(0);return a;
+  };
+  const prev=JSON.stringify(g2Board);
+  if(dir==='left')for(let r=0;r<G2N;r++)g2Board[r]=merge(g2Board[r]);
+  else if(dir==='right')for(let r=0;r<G2N;r++)g2Board[r]=merge([...g2Board[r]].reverse()).reverse();
+  else if(dir==='up')for(let c=0;c<G2N;c++){const col=merge(g2Board.map(row=>row[c]));col.forEach((v,r)=>g2Board[r][c]=v);}
+  else if(dir==='down')for(let c=0;c<G2N;c++){const col=merge(g2Board.map(row=>row[c]).reverse()).reverse();col.forEach((v,r)=>g2Board[r][c]=v);}
+  if(JSON.stringify(g2Board)!==prev){
+    g2Add();g2Render();
+    if(g2Won2){document.getElementById('g2-msg').style.color='#ffdd00';document.getElementById('g2-msg').textContent='🎉 2048 달성! 계속 플레이하세요';}
+    else if(g2CheckOver()){g2Over=true;document.getElementById('g2-msg').style.color='#ff4466';document.getElementById('g2-msg').textContent='게임 오버';}
+  }
+}
+function g2CheckOver(){
+  for(let r=0;r<G2N;r++)for(let c=0;c<G2N;c++){
+    if(!g2Board[r][c])return false;
+    if(c<G2N-1&&g2Board[r][c]===g2Board[r][c+1])return false;
+    if(r<G2N-1&&g2Board[r][c]===g2Board[r+1][c])return false;
+  }
+  return true;
+}
+document.addEventListener('keydown',e=>{
+  if(activeGame!=='2048')return;
+  const M={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};
+  if(M[e.code]){g2Move(M[e.code]);e.preventDefault();}
+});
+let g2tx,g2ty;
+document.getElementById('g2-board').addEventListener('touchstart',e=>{g2tx=e.touches[0].clientX;g2ty=e.touches[0].clientY;},{passive:true});
+document.getElementById('g2-board').addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-g2tx,dy=e.changedTouches[0].clientY-g2ty;
+  if(Math.abs(dx)>Math.abs(dy))g2Move(dx>0?'right':'left');else g2Move(dy>0?'down':'up');
+},{passive:true});
+
+/* ════════════════════════════════════════════
+   MINESWEEPER
+════════════════════════════════════════════ */
+const MSR=9,MSC=9,MSM=10;
+let msGrid,msOpen,msFlag,msFirst,msOver,msWon2,msTm,msTmIv;
+const NCOL=['','#6699ff','#44ff88','#ff4466','#3366ff','#cc0000','#00aaaa','#888','#555'];
+
+function msInit(){
+  clearInterval(msTmIv);msTm=0;
+  document.getElementById('ms-time').textContent=0;
+  document.getElementById('ms-left').textContent=MSM;
+  document.getElementById('ms-result').textContent='';
+  msGrid=Array.from({length:MSR},()=>Array(MSC).fill(0));
+  msOpen=Array.from({length:MSR},()=>Array(MSC).fill(false));
+  msFlag=Array.from({length:MSR},()=>Array(MSC).fill(false));
+  msFirst=true;msOver=false;msWon2=false;
+  msRender();
+}
+function msPlace(sr,sc){
+  let placed=0;
+  while(placed<MSM){
+    const r=Math.floor(Math.random()*MSR),c=Math.floor(Math.random()*MSC);
+    if(msGrid[r][c]===-1)continue;
+    if(Math.abs(r-sr)<=1&&Math.abs(c-sc)<=1)continue;
+    msGrid[r][c]=-1;placed++;
+  }
+  for(let r=0;r<MSR;r++)for(let c=0;c<MSC;c++)if(msGrid[r][c]!==-1){
+    let n=0;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<MSR&&nc>=0&&nc<MSC&&msGrid[nr][nc]===-1)n++;}
+    msGrid[r][c]=n;
+  }
+}
+function msReveal(r,c){
+  if(r<0||r>=MSR||c<0||c>=MSC||msOpen[r][c]||msFlag[r][c])return;
+  msOpen[r][c]=true;
+  if(msGrid[r][c]===0)for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)msReveal(r+dr,c+dc);
+}
+function msClick(r,c){
+  if(msOver||msWon2||msFlag[r][c]||msOpen[r][c])return;
+  if(msFirst){
+    msFirst=false;msPlace(r,c);
+    msTmIv=setInterval(()=>{msTm++;document.getElementById('ms-time').textContent=msTm;},1000);
+  }
+  if(msGrid[r][c]===-1){
+    msOver=true;clearInterval(msTmIv);
+    for(let rr=0;rr<MSR;rr++)for(let cc=0;cc<MSC;cc++)if(msGrid[rr][cc]===-1)msOpen[rr][cc]=true;
+    msRender(r,c);
+    document.getElementById('ms-result').style.color='#ff4466';
+    document.getElementById('ms-result').textContent='💥 지뢰를 밟았습니다!';
+    return;
+  }
+  msReveal(r,c);msCheckWin();msRender();
+}
+function msRightClick(r,c,e){
+  e.preventDefault();
+  if(msOver||msWon2||msOpen[r][c])return;
+  msFlag[r][c]=!msFlag[r][c];
+  document.getElementById('ms-left').textContent=MSM-msFlag.flat().filter(Boolean).length;
+  msRender();
+}
+function msCheckWin(){
+  if(msOpen.flat().filter(Boolean).length===MSR*MSC-MSM){
+    msWon2=true;clearInterval(msTmIv);
+    document.getElementById('ms-result').style.color='#44ff88';
+    document.getElementById('ms-result').textContent='🎉 성공! '+msTm+'초 클리어';
+  }
+}
+function msStop(){clearInterval(msTmIv);}
+function msRender(hr,hc){
+  const bd=document.getElementById('ms-board');
+  bd.style.gridTemplateColumns=`repeat(${MSC},36px)`;bd.innerHTML='';
+  for(let r=0;r<MSR;r++)for(let c=0;c<MSC;c++){
+    const cell=document.createElement('div');cell.className='ms-cell';
+    const hit=hr===r&&hc===c;
+    if(hit)cell.classList.add('boom');
+    else if(msOpen[r][c])cell.classList.add('open');
+    else if(msFlag[r][c])cell.classList.add('flagged');
+    if(msOpen[r][c]){
+      if(msGrid[r][c]===-1)cell.textContent='💣';
+      else if(msGrid[r][c]>0){cell.textContent=msGrid[r][c];cell.style.color=NCOL[msGrid[r][c]];}
+    }else if(msFlag[r][c])cell.textContent='🚩';
+    cell.addEventListener('click',()=>msClick(r,c));
+    cell.addEventListener('contextmenu',e=>msRightClick(r,c,e));
+    bd.appendChild(cell);
+  }
+}
 </script>
 </body>
 </html>
